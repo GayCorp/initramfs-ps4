@@ -36,7 +36,7 @@ jobs:
 
           git -c http.extraheader="AUTHORIZATION: basic $AUTH" \
             clone --depth 1 \
-            https://github.com/GattoDev-debug/initramfs-ps4-private.git \
+            https://github.com/GayCorp/initramfs-ps4-private.git \
             "$TEMP_DIR/firmware"
 
           test -d "$TEMP_DIR/firmware/amdgpu"
