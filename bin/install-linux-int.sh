@@ -1,86 +1,97 @@
 #!/bin/sh
 . /functions.sh
-# Prompt user for seek value
-eask "Enter the amount of storage to dedicate to your linux install (GB's): "
+
+# Prompt user for installation settings
+eask "Enter the amount of storage to dedicate to your Linux install (GB): "
 read seek_value
+
 eask "Pick your file system (1 - ext4, 2 - btrfs): "
 read fs
-# Check if key file exists and is readable
-if test -r /key/eap_hdd_key.bin; then
-    # Check if physical device exists and is accessible
-    if test -b /dev/sda27; then
-        # Set up encrypted device
-        cryptsetup -d /key/eap_hdd_key.bin --cipher=aes-xts-plain64 -s 256 --offset=0 --skip=111669149696 create ps4hdd /dev/sda27
-        if ! test -r /ps4hdd/system/boot/psxitarch.tar.xz &&
-           ! test -r /ps4hdd/system/boot/distro.tar.xz; then
-            eerror "Distro file was not found."
-            exit 1
-        fi
-        # Check if /ps4hdd directory exists
-        if test -d /ps4hdd; then
-            einfo "/ps4hdd directory already exists. Skipping mkdir command."
-        else
-            # Create directory
-            mkdir /ps4hdd
-        fi
 
-        # Mount encrypted device
-        mount -a -t ufs -o ufstype=ufs2 /dev/mapper/ps4hdd /ps4hdd
+# Check decryption key
+if ! test -r /key/eap_hdd_key.bin; then
+    eerror "Error: decryption key does not exist or is not accessible."
+    exit 1
+fi
 
-        # Check if mount was successful
-        if mountpoint -q /ps4hdd; then
-            if test -r /ps4hdd/system/boot/psxitarch.tar.xz; then
-                mv -f /ps4hdd/system/boot/psxitarch.tar.xz /ps4hdd/system/boot/distro.tar.xz
-                ewarn "psxitarch.tar.xz was found, but was renamed to distro.tar.xz. from now on, please use distro.tar.xz instead of psxitarch.tar.xz."
-                sleep 1
-            fi
-            # Create image file with user-specified seek value and set up loop device
-            dd if=/dev/null of=/ps4hdd/home/linux.img bs=1073741824 seek=$seek_value
-            losetup /dev/loop5 /ps4hdd/home/linux.img
+# Check physical device
+if ! test -b /dev/sda27; then
+    eerror "Error: /dev/sda27 device does not exist or is not accessible."
+    exit 1
+fi
 
-            # Create ext4 filesystem on loop device
-            case "$fs" in
-                1)
-                    mkfs.ext4 /dev/loop5
-                    ;;
-                2)
-                    mkfs.btrfs /dev/loop5
-                    ;;
-                *)
-                    eerror "I don't understand this file system choice."
-                    exit 1
-                    ;;
-            esac
-            # Mount loop device
-            mount /dev/loop5 /newroot
-            # Check if mount was successful
-            if mountpoint -q /newroot; then
-                # Extract tar file to new root directory
-                if test -r /ps4hdd/system/boot/distro.tar.xz; then
-                    ( cd /newroot; tar -xvJf /ps4hdd/system/boot/distro.tar.xz; )
-                    einfo "--INSTALL COMPLETE--"
-                    einfo "If you are reading this message type: resume-boot a few times to boot into the distro"
-                    einfo "If It fails, try running: fix-install.sh and resume-boot again."
-                    find-install.sh
-                else
-                    eerror "Error: /ps4hdd/system/boot/distro.tar.xz file does not exist or is not readable."
-                    exit 1
-                fi
-            else
-                eerror "Error: failed to mount /dev/loop5 on /newroot."
-                exit 1
-            fi
-        else
-            eerror "Error: failed to mount /dev/mapper/ps4hdd on /ps4hdd."
-            exit 1
-        fi
-    else
-        eerror "Error: /dev/sda27 device does not exist or is not accessible."
+if ! test -r /ps4hdd/system/boot/psxitarch.tar.xz &&
+   ! test -r /ps4hdd/system/boot/distro.tar.xz; then
+    eerror "Distro file was not found."
+    exit 1
+fi
+
+if ! mountpoint -q /ps4hdd; then
+    eerror "Error: failed to mount /dev/mapper/ps4hdd on /ps4hdd."
+    exit 1
+fi
+
+# Rename legacy distro archive
+if test -r /ps4hdd/system/boot/psxitarch.tar.xz; then
+    mv -f /ps4hdd/system/boot/psxitarch.tar.xz \
+        /ps4hdd/system/boot/distro.tar.xz
+
+    ewarn "psxitarch.tar.xz was renamed to distro.tar.xz. Use distro.tar.xz from now on."
+    sleep 1
+fi
+
+# Create installation image
+dd if=/dev/null \
+    of=/ps4hdd/home/linux.img \
+    bs=1073741824 seek="$seek_value"
+
+# Set up loop device
+losetup /dev/loop5 /ps4hdd/home/linux.img
+
+# Create filesystem
+case "$fs" in
+    1)
+        mkfs.ext4 /dev/loop5
+        ;;
+    2)
+        mkfs.btrfs /dev/loop5
+        ;;
+    *)
+        eerror "I don't understand this file system choice."
+        exit 1
+        ;;
+esac
+
+# Mount installation image
+mount /dev/loop5 /newroot
+
+if ! mountpoint -q /newroot; then
+    eerror "Error: failed to mount /dev/loop5 on /newroot."
+    exit 1
+fi
+
+# Extract distro with progress bar
+if test -r /ps4hdd/system/boot/distro.tar.xz; then
+    pv -pterb \
+        -s "$(stat -c %s /ps4hdd/system/boot/distro.tar.xz)" \
+        /ps4hdd/system/boot/distro.tar.xz |
+        (cd /newroot && tar -xJf -)
+
+    if test "$?" -ne 0; then
+        eerror "Error: distro extraction failed."
         exit 1
     fi
 
-    else
-        eerror "Error: decryption key does not exist or is not accessible."
-        exit 1
-    fi
+    einfo "--INSTALL COMPLETE--"
+    einfo "If you are reading this message, type: resume-boot a few times to boot into the distro."
+    einfo "If it fails, try running: fix-install.sh and resume-boot again."
+
+    find-install.sh
+    sleep 1
+    fix-install.sh
+else
+    eerror "Error: distro.tar.xz does not exist or is not readable."
+    exit 1
+fi
+
 resume-boot
