@@ -48,10 +48,6 @@ rescueshell() {
 	ewarn "Rescue Shell (busybox's /bin/sh)"
 	ewarn "To reboot, press 'control-alt-delete'."
 	ewarn "If you wish resume booting process, run 'resume-boot'."
-	ewarn
-	ewarn
-	ewarn "If you are here because of a /dev/loop0 error, run 'temporary-boot.sh'"
-	ewarn "I'm currently fixing the issue."
 	if [ "$console" ] && [ -c "/dev/${console}" ]; then
 		setsid sh -c "exec sh --login </dev/"${console}" >/dev/${console} 2>&1"
 	elif [ -c '/dev/tty1' ]; then
