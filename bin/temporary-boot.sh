@@ -1,5 +1,2 @@
 #!/bin/sh
-
-find-install.sh
-sleep 2
-resume-boot
+find-install.sh && resume-boot
