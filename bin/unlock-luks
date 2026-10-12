@@ -42,5 +42,5 @@ printf 'Enter password: '
 stty -echo
 read luks_password
 stty echo
-printf "${luks_password}" >/luks_passfifo
+printf '%s' "${luks_password}" >/luks_passfifo
 printf '\n'
