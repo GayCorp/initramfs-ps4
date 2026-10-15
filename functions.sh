@@ -641,7 +641,9 @@ ps4hdd_open() {
 			ewarn "No PS4 internal drive found (no /dev/sd?27)."
 			return 1
 		fi
-		cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 --skip 111669149696 create ps4hdd "${part}" || return 1
+		cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 --skip 111669149696 create ps4hdd "${part}" ||
+			cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 create ps4hdd "${part}" ||
+			return 1
 	fi
 	mkdir -p /ps4hdd
 	if ! mount -t ufs -o ufstype=ufs2 /dev/mapper/ps4hdd /ps4hdd; then
