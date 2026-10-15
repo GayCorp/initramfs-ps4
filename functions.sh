@@ -719,7 +719,19 @@ ps4_find_distro() {
 	fi
 	return 1
 }
+ps4_current_setup() {
+    if [ -f /ps4hdd/system/boot/initramfs.cpio.gz ]; then
+        echo "/ps4hdd/system/boot"
+        return 0
+    fi
 
+    if [ -f /temp/initramfs.cpio.gz ]; then
+        echo "/temp"
+        return 0
+    fi
+
+    return 1
+}
 ps4_extract() {
 	local z=''
 	case "$1" in
