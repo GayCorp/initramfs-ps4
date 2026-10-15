@@ -156,36 +156,6 @@ process_commandline_options() {
 			ro|rw)
 				root_rw_ro=$i
 			;;
-			sshd)
-				sshd=true
-			;;
-			sshd_wait\=*)
-				sshd_wait=$(get_opt $i)
-			;;
-			sshd_port\=*)
-				sshd_port=$(get_opt $i)
-			;;
-			sshd_interface\=*)
-				# deprecated
-				sshd_interface=$(get_opt $i)
-			;;
-			sshd_ipv4\=*)
-				# deprecated
-				sshd_ipv4=$(get_opt $i)
-			;;
-			sshd_ipv4_gateway\=*)
-				# deprecated
-				sshd_ipv4_gateway=$(get_opt $i)
-			;;
-			binit_net_if\=*)
-				binit_net_if=$(get_opt $i)
-			;;
-			binit_net_addr\=*)
-				binit_net_addr=$(get_opt $i)
-			;;
-			binit_net_gw\=*)
-				binit_net_gw=$(get_opt $i)
-			;;
 			rootdelay\=*)
 				rootdelay=$(get_opt $i)
 			;;
@@ -292,13 +262,7 @@ InitializeLUKS() {
 			cryptsetup_args="${cryptsetup_args} --allow-discards"
 		fi
 
-		if use sshd; then
-			askpass "Enter passphrase for ${enc_dev}: " | run cryptsetup --tries 1 --key-file=- luksOpen ${cryptsetup_args} "${enc_dev}" "${dev_name}"
-			# Remove the fifo, askpass will create new if needed (ex multiple devices).
-			rm '/luks_passfifo'
-		else
-			run cryptsetup luksOpen --tries 25 ${cryptsetup_args} "${enc_dev}" "${dev_name}"
-		fi
+		run cryptsetup luksOpen --tries 25 ${cryptsetup_args} "${enc_dev}" "${dev_name}"
 		enc_num="$((enc_num+1))"
 	done
 }
@@ -379,128 +343,8 @@ register_bcache_devices() {
 	done
 }
 
-SetupNetwork() {
-	# Defaults ...
-	vlan='false'
-
-	# backward compatibility
-	if [ "${sshd_interface}" ]; then
-		ewarn "sshd_interface is deprecated, check README"
-		ewarn "and switch to binit_net_if!"
-		binit_net_if="${sshd_interface}"
-		binit_net_addr="${sshd_ipv4}"
-		binit_net_gw="${sshd_ipv4_gateway}"
-	fi
-
-	# setting _interface is the trigger.
-	# after dropping backward compatibility there should be
-	# a 'use FOO && SetupNetwork' in init script.
-	use binit_net_if || return
-
-	musthave binit_net_addr
-
-	run ip link set up dev lo
-
-	case "${binit_net_if}" in
-		*'.'*)
-			vlan='true'
-			binit_net_physif="${binit_net_if%%.*}"
-			local binit_net_vlan="${binit_net_if##*.}"
-			einfo "Bringing up ${binit_net_physif} interface ..."
-			run ip link set up dev "${binit_net_physif}"
-			einfo "Adding VLAN ${binit_net_vlan} on ${binit_net_physif} interface ..."
-			run vconfig add "${binit_net_physif}" "${binit_net_vlan}"
-		;;
-	esac
-
-	einfo "Bringing up ${binit_net_if} interface ..."
-	run ip link set up dev "${binit_net_if}"
-	einfo "Setting ${binit_net_addr} on ${binit_net_if} ..."
-	run ip addr add "${binit_net_addr}" dev "${binit_net_if}"
-
-	if [ -n "${binit_net_gw}" ]; then
-		einfo "Setting default routing via '${binit_net_gw}' ..."
-		run ip route add default via "${binit_net_gw}" dev "${binit_net_if}"
-	fi
-}
-
-setup_sshd() {
-	# Prepare /dev/pts.
-	einfo "Mounting /dev/pts ..."
-	if ! [ -d /dev/pts ]; then run mkdir /dev/pts; fi
-	run mount -t devpts none /dev/pts
-
-	# Prepare dirs.
-	dodir /etc/dropbear /var/log /var/run /root/.ssh
-
-	# Generate host keys.
-	einfo "Generating dropbear ssh host keys ..."
-	test -f /etc/dropbear/dropbear_rsa_host_key || \
-		run dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key > /dev/null
-	test -f /etc/dropbear/dropbear_dss_host_key || \
-		run dropbearkey -t dss -f /etc/dropbear/dropbear_dss_host_key > /dev/null
-
-	# Prepare root account.
-	run echo 'root:x:0:0:root:/root:/bin/sh' > /etc/passwd
-
-	if [ -f /authorized_keys ]; then
-		run cp /authorized_keys /root/.ssh/authorized_keys
-	else
-		eerror "Missing /authorized_keys file, you will be no able login via sshd."
-		rescueshell
-	fi
-
-	einfo 'Starting dropbear sshd ...'
-	run dropbear -s -p "${binit_net_addr%/*}:${sshd_port:-22}"
-}
-
-wait_sshd() {
-	if use sshd_wait; then
-		# sshd_wait exist, now we should sleep for X sec.
-		if [ "${sshd_wait}" -gt 0 2>/dev/null ]; then
-			einfo "Waiting ${sshd_wait}s (sshd_wait)"
-			while [ ${sshd_wait} -gt 0 ]; do
-				[ -f '/remote-rescueshell.lock' ] && break
-				sshd_wait=$((sshd_wait - 1))
-				sleep 1
-			done
-		else
-			ewarn "\$sshd_wait variable must be numeric and greater than zero. Skipping sshd_wait."
-		fi
-	fi
-}
-
 cleanup() {
-	if use binit_net_if; then
-		if [ -f '/remote-rescueshell.lock' ]; then
-			ewarn "The lockfile at '/remote-rescueshell.lock' exist."
-			ewarn "The boot process will be paused until the lock is removed."
-			while true; do
-				if [ -f '/remote-rescueshell.lock' ]; then
-					sleep 1
-				else
-					break
-				fi
-			done
-		fi
-
-	fi
-
 	was_shell && rm /rescueshell.pid
-
-	if use sshd; then
-		run pkill -9 dropbear > /dev/null 2>&1
-	fi
-
-	if use binit_net_if; then
-		run ip addr flush dev "${binit_net_if}"
-		run ip route flush dev "${binit_net_if}"
-		run ip link set down dev "${binit_net_if}"
-		if use vlan; then
-			run ip link del "${binit_net_if}"
-			run ip link set down dev "${binit_net_physif}"
-		fi
-	fi
 }
 
 boot_newroot() {

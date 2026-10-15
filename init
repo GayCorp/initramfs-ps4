@@ -68,8 +68,6 @@ process_commandline_options
 InitializeBusybox
 emount /dev
 run_hooks early
-#SetupNetwork
-#use sshd && setup_sshd
 loadkeymap
 
 # Let's try to support all possible combinations of storage layers.
