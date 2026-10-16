@@ -575,6 +575,12 @@ ps4_find_install() {
 			return 0
 		fi
 	fi
+	case "$(ps4_southbridge 2>/dev/null)" in
+		*Baikal*) # since we're on baikal, don't check internal as its broken
+			ewarn "External installation not found."
+			return 1
+			;;
+	esac
 	ewarn "External installation not found, checking internal drive..."
 	if ps4hdd_open && [ -f /ps4hdd/home/linux.img ]; then
 		ps4_fsck /ps4hdd/home/linux.img
