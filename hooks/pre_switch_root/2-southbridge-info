@@ -1,0 +1,16 @@
+#!/bin/sh
+
+sb=$(ps4_southbridge 2>/dev/null)
+if [ -z "$sb" ]; then
+    return 0 2>/dev/null || exit 0
+fi
+
+code=$(ps4_southbridge_code "$sb" 2>/dev/null)
+
+mkdir -p "/newroot/etc/ps4"
+
+[ -n "$sb" ]   && echo "$sb"   > "/newroot/etc/ps4/southbridge-name"   # Belize A0
+[ -n "$code" ] && echo "$code" > "/newroot/etc/ps4/southbridge-hex"    # 0x20100
+
+chmod 0444 "/newroot/etc/ps4"/* 2>/dev/null
+sync

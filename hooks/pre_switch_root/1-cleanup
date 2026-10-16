@@ -1,0 +1,8 @@
+#!/bin/sh
+if [ -d "/newroot/etc/ps4" ]; then
+    rm -rf "/newroot/etc/ps4"
+fi
+if [ -d "/newroot/lib/firmware/edid/" ]; then
+    rm -rf "/newroot/lib/firmware/edid/"
+fi
+sleep 1
