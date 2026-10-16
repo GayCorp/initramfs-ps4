@@ -496,7 +496,19 @@ ps4hdd_open() {
 	fi
 }
 ps4_southbridge() {
-    dmesg | grep -m1 southbridge | cut -d: -f5 | cut -d"[" -f1 | xargs
+    local sb
+    sb=$(dmesg | grep -m1 southbridge | cut -d: -f5 | cut -d"[" -f1 | xargs)
+
+    # Older kernels don't print the southbridge line. On those, the only
+    # systems we care about are Baikal, and the kernel release string says so.
+    if [ -z "$sb" ]; then
+        case "$(uname -r)" in
+            *[Bb]aikal*) sb="Baikal A0" ;;
+        esac
+    fi
+
+    [ -n "$sb" ] || return 1
+    printf '%s\n' "$sb"
 }
 
 ps4_southbridge_code() {
