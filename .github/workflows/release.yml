@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Build mode'
+        type: choice
+        options: [artifact, release, latest]
+        default: artifact
 
 permissions:
   contents: write
@@ -81,8 +87,41 @@ jobs:
           zcat initramfs.cpio.gz | cpio -it --quiet |
             grep -E '^(\./)?lib/firmware/(amdgpu|mrvl)/'
 
+      - name: Determine release mode
+        id: mode
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          INPUT_MODE: ${{ inputs.mode }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -eu
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            MODE="$INPUT_MODE"
+          else
+            MSG_LC="$(printf '%s' "$COMMIT_MSG" | tr '[:upper:]' '[:lower:]')"
+            if printf '%s' "$MSG_LC" | grep -q 'latest'; then
+              MODE="latest"
+            elif printf '%s' "$MSG_LC" | grep -q 'release'; then
+              MODE="release"
+            else
+              MODE="artifact"
+            fi
+          fi
+
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "Build mode: $MODE"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: initramfs-${{ github.sha }}
+          path: initramfs.cpio.gz
+          retention-days: 30
+
       - name: Compute release tag
         id: tag
+        if: steps.mode.outputs.mode == 'release'
         run: |
           SHORT_SHA="$(git rev-parse --short HEAD)"
           TAG="build-${SHORT_SHA}"
@@ -91,6 +130,7 @@ jobs:
           echo "Releasing as $TAG"
 
       - name: Create GitHub Release
+        if: steps.mode.outputs.mode == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
@@ -102,4 +142,21 @@ jobs:
             **Size:** see asset below
           files: initramfs.cpio.gz
           fail_on_unmatched_files: true
+          make_latest: false
           generate_release_notes: true
+
+      - name: Update bleeding-edge "latest" release
+        if: steps.mode.outputs.mode == 'latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest build (bleeding edge)"
+          body: |
+            Rolling release — always the newest successful build from `main`.
+
+            **Commit:** ${{ github.sha }}
+            **Archive:** `initramfs.cpio.gz`
+          files: initramfs.cpio.gz
+          fail_on_unmatched_files: true
+          make_latest: true
+          prerelease: false
