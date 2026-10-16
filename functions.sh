@@ -495,7 +495,39 @@ ps4hdd_open() {
 		return 1
 	fi
 }
+ps4_southbridge() {
+    dmesg | grep -m1 southbridge | cut -d: -f5 | cut -d"[" -f1 | xargs
+}
 
+ps4_southbridge_code() {
+    case "${1:-$(ps4_southbridge)}" in
+        "Aeolia A0")  echo 0x10100 ;;
+        "Aeolia A1")  echo 0x10200 ;;
+        "Aeolia A2")  echo 0x10300 ;;
+        "Belize A0")  echo 0x20100 ;;
+        "Belize B0")  echo 0x20200 ;;
+        "Baikal A0")  echo 0x30100 ;;
+        "Baikal B0")  echo 0x30200 ;;
+        "Baikal B1")  echo 0x30201 ;;
+        "Belize2 A0") echo 0x40100 ;;
+        *)            return 1 ;;
+    esac
+}
+
+ps4_southbridge_name() {
+    case "${1:-$(ps4_southbridge_code)}" in
+        0x10100) echo "Aeolia A0"  ;;
+        0x10200) echo "Aeolia A1"  ;;
+        0x10300) echo "Aeolia A2"  ;;
+        0x20100) echo "Belize A0"  ;;
+        0x20200) echo "Belize B0"  ;;
+        0x30100) echo "Baikal A0"  ;;
+        0x30200) echo "Baikal B0"  ;;
+        0x30201) echo "Baikal B1"  ;;
+        0x40100) echo "Belize2 A0" ;;
+        *)       return 1 ;;
+    esac
+}
 ps4_wait_disks() {
 	local n=0
 	while [ "${n}" -lt "${1:-8}" ]; do

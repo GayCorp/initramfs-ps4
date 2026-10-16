@@ -55,9 +55,10 @@ readonly default_ifs="${IFS}"
 kernelver="$(uname -r)"
 ver="$(cat /VERSION)"
 hash="$(cat /GIT_HASH)"
+# figure out southbridge
+sb="$(ps4_southbridge)"
+einfo "initramfs-ps4 ${ver}-git-${hash}. Linux kernel ${kernelver}. Running ${sb} Southbridge.\n"
 
-einfo "initramfs-ps4 ${ver}-git-${hash}. Linux kernel ${kernelver}.\n"
-echo -e "\nWelcome to initramfs-ps4 ${ver}. Linux kernel ${kernelver}.\n" > /etc/motd
 ewarn "This is experimental software."
 emount /proc /sys
 
@@ -83,6 +84,7 @@ use tuxonice TuxOnIceResume
 run_hooks pre_newroot_mount
 use rootdelay rootdelay
 ps4_wait_disks 8
+echo
 if ! ps4_find_install && use root; then
 	emount /newroot
 fi
