@@ -485,9 +485,11 @@ ps4hdd_open() {
 			ewarn "No PS4 internal drive found (no /dev/sd?27)."
 			return 1
 		fi
-		cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 --skip 111669149696 create ps4hdd "${part}" ||
-			cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 create ps4hdd "${part}" ||
-			return 1
+		if ps4_is_southbridge "aeolia"; then
+			cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 create ps4hdd "${part}" || return 1
+		else
+			cryptsetup -d /key/eap_hdd_key.bin --cipher aes-xts-plain64 -s 256 --offset 0 --skip 111669149696 create ps4hdd "${part}" || return 1
+		fi
 	fi
 	mkdir -p /ps4hdd
 	if ! mount -t ufs -o ufstype=ufs2 /dev/mapper/ps4hdd /ps4hdd; then
@@ -510,7 +512,19 @@ ps4_southbridge() {
     [ -n "$sb" ] || return 1
     printf '%s\n' "$sb"
 }
+ps4_is_southbridge() {
+    local target="${1:-}" current
+    [ -n "$target" ] || return 1
+    current="$(ps4_southbridge)" || return 1
 
+    target="$(printf '%s' "$target"  | tr 'A-Z' 'a-z')"
+    current="$(printf '%s' "$current" | tr 'A-Z' 'a-z')"
+
+    case "$current" in
+        "$target" | "$target "*) return 0 ;;
+    esac
+    return 1
+}
 ps4_southbridge_code() {
     case "${1:-$(ps4_southbridge)}" in
         "Aeolia A0")  echo 0x10100 ;;
@@ -575,12 +589,10 @@ ps4_find_install() {
 			return 0
 		fi
 	fi
-	case "$(ps4_southbridge 2>/dev/null)" in
-		*Baikal*) # since we're on baikal, don't check internal as its broken
-			ewarn "External installation not found."
-			return 1
-			;;
-	esac
+	if ps4_is_southbridge "baikal"; then # since we're on baikal, don't check internal as its broken
+		ewarn "External installation not found."
+		return 1
+	fi
 	ewarn "External installation not found, checking internal drive..."
 	if ps4hdd_open && [ -f /ps4hdd/home/linux.img ]; then
 		ps4_fsck /ps4hdd/home/linux.img
@@ -592,7 +604,6 @@ ps4_find_install() {
 	ewarn "No installation found on internal drive either."
 	return 1
 }
-
 ps4_prepare_newroot() {
 	local d
 	for d in dev media mnt proc run sys tmp var/cache var/log var/tmp; do
