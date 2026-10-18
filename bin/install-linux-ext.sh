@@ -2,7 +2,6 @@
 . /functions.sh
 
 src=/temp
-boot=''
 
 disk_info() {
 	local name="${1#/dev/}"
@@ -11,12 +10,8 @@ disk_info() {
 	echo "${1} \"${model:-Unknown}\" $((size / 2048)) MB"
 }
 
-has_boot_files() {
-	[ -f "${1}/bzImage" ] && [ -f "${1}/initramfs.cpio.gz" ]
-}
-
 has_files() {
-	has_boot_files "${1}" && { [ -n "${internal_distro}" ] || ps4_find_distro "${1}" >/dev/null; }
+	[ -f "${src}/bzImage" ] && [ -f "${src}/initramfs.cpio.gz" ] && ps4_find_distro "${src}" >/dev/null
 }
 
 pick_disk() {
@@ -49,101 +44,50 @@ mkdir -p "${src}"
 internal=''
 part="$(ps4hdd_part)" && internal="${part%27}"
 
-# Open the internal PS4 drive so we can look for install files there.
-internal_root=''
-if mountpoint -q /ps4hdd; then
-	internal_root=/ps4hdd
-elif [ -n "${part}" ] && command -v ps4hdd_open >/dev/null 2>&1 && ps4hdd_open 2>/dev/null; then
-	internal_root=/ps4hdd
-fi
-[ -n "${internal_root}" ] && boot="${internal_root}/system/boot"
-
-# Look for a distro tarball on the internal drive. If present, the source
-# USB no longer needs to contain it.
-internal_distro=''
-if [ -n "${boot}" ] && [ -d "${boot}" ]; then
-	if internal_distro="$(ps4_find_distro "${boot}" 2>/dev/null)"; then
-		einfo "Found $(basename "${internal_distro}") on the internal drive."
-	else
-		internal_distro=''
-	fi
-fi
-
 all=''
 for d in /dev/sd[a-z]; do
 	[ -b "${d}" ] && [ "${d}" != "${internal}" ] && all="${all} ${d}"
 done
 
-# If the internal drive has bzImage, initramfs and the distro, we do not
-# need a source USB at all - only a target USB.
+einfo "Searching for the USB device with the install files..."
 source=''
-srcdir=''
-source_is_internal=''
-if [ -n "${internal_distro}" ] && [ -n "${boot}" ] && has_boot_files "${boot}"; then
-	source=internal
-	source_is_internal=1
-	srcdir="${boot}"
-	einfo "Using install files from the internal PS4 drive."
-else
-	einfo "Searching for the USB device with the install files..."
-	for d in ${all}; do
-		if mount -o ro "${d}1" "${src}" 2>/dev/null; then
-			if has_files "${src}"; then
-				source="${d}"
-				srcdir="${src}"
-				break
-			fi
-			umount "${src}"
+for d in ${all}; do
+	if mount -o ro "${d}1" "${src}" 2>/dev/null; then
+		if has_files; then
+			source="${d}"
+			break
 		fi
-	done
+		umount "${src}"
+	fi
+done
 
-	if [ -z "${source}" ]; then
-		ewarn "No USB device with bzImage, initramfs.cpio.gz and a distro tarball was found."
-		disks="${all}"
-		[ -n "${disks}" ] || { eerror "No USB drives found."; exit 1; }
-		pick_disk "Pick the installation source drive: "
-		source="${picked}"
-		if ! mount -o ro "${source}1" "${src}"; then
-			eerror "Could not mount ${source}1."
-			exit 1
-		fi
-		if ! has_files "${src}"; then
-			umount "${src}"
-			eerror "${source}1 does not contain the required files."
-			exit 1
-		fi
-		srcdir="${src}"
+if [ -z "${source}" ]; then
+	ewarn "No USB device with bzImage, initramfs.cpio.gz and a distro tarball was found."
+	disks="${all}"
+	[ -n "${disks}" ] || { eerror "No USB drives found."; exit 1; }
+	pick_disk "Pick the installation source drive: "
+	source="${picked}"
+	if ! mount -o ro "${source}1" "${src}"; then
+		eerror "Could not mount ${source}1."
+		exit 1
+	fi
+	if ! has_files; then
+		umount "${src}"
+		eerror "${source}1 does not contain the required files."
+		exit 1
 	fi
 fi
+einfo "Install files: $(disk_info "${source}")"
 
-if [ -n "${source_is_internal}" ]; then
-	einfo "Install files: internal drive"
-else
-	einfo "Install files: $(disk_info "${source}")"
-fi
-
-# Prefer the distro next to the boot files, fall back to internal.
-distro=''
-if ! distro="$(ps4_find_distro "${srcdir}" 2>/dev/null)"; then
-	distro="${internal_distro}"
-fi
-if [ -z "${distro}" ]; then
-	[ -n "${source_is_internal}" ] || umount "${src}"
-	eerror "No distro tarball found."
-	exit 1
-fi
+distro="$(ps4_find_distro "${src}")"
 
 disks=''
-if [ -n "${source_is_internal}" ]; then
-	disks="${all}"
-else
-	for d in ${all}; do
-		[ "${d}" != "${source}" ] && disks="${disks} ${d}"
-	done
-fi
+for d in ${all}; do
+	[ "${d}" != "${source}" ] && disks="${disks} ${d}"
+done
 if [ -z "${disks}" ]; then
-	[ -n "${source_is_internal}" ] || umount "${src}"
-	eerror "No USB drive to install onto. Plug in a USB drive."
+	umount "${src}"
+	eerror "No other USB drive to install onto. Plug in a second drive."
 	exit 1
 fi
 
@@ -155,7 +99,7 @@ ewarn "All data on $(disk_info "${target}") will be erased."
 eask "Type YES to continue: "
 read answer
 if [ "${answer}" != 'YES' ]; then
-	[ -n "${source_is_internal}" ] || umount "${src}"
+	umount "${src}"
 	eerror "Aborted."
 	exit 1
 fi
@@ -182,7 +126,7 @@ n=0
 while ! [ -b "${target}1" ] || ! [ -b "${target}2" ]; do
 	n=$((n + 1))
 	if [ "${n}" -gt 10 ]; then
-		[ -n "${source_is_internal}" ] || umount "${src}"
+		umount "${src}"
 		eerror "Partitions on ${target} did not show up."
 		exit 1
 	fi
@@ -191,28 +135,28 @@ done
 
 einfo "Formatting the boot partition..."
 if ! mkfs.vfat "${target}1" >/dev/null || ! mount "${target}1" /newroot; then
-	[ -n "${source_is_internal}" ] || umount "${src}"
+	umount "${src}"
 	eerror "Could not format or mount ${target}1."
 	exit 1
 fi
-cp "${srcdir}/bzImage" "${srcdir}/initramfs.cpio.gz" /newroot/
-[ -f "${srcdir}/bootargs.txt" ] && cp "${srcdir}/bootargs.txt" /newroot/
+cp "${src}/bzImage" "${src}/initramfs.cpio.gz" /newroot/
+[ -f "${src}/bootargs.txt" ] && cp "${src}/bootargs.txt" /newroot/
 umount /newroot
 
 einfo "Formatting the Linux partition..."
 if ! mke2fs-new -q -t ext4 -F -L psxitarch -O ^has_journal "${target}2" || ! mount "${target}2" /newroot; then
-	[ -n "${source_is_internal}" ] || umount "${src}"
+	umount "${src}"
 	eerror "Could not format or mount ${target}2."
 	exit 1
 fi
 
 einfo "Extracting $(basename "${distro}"), do not remove the USB drives or turn off the PS4..."
 if ! ps4_extract "${distro}"; then
-	[ -n "${source_is_internal}" ] || umount "${src}"
+	umount "${src}"
 	eerror "Distro extraction failed."
 	exit 1
 fi
-[ -n "${source_is_internal}" ] || umount "${src}"
+umount "${src}"
 
 if [ -r /key/eap_hdd_key.bin ]; then
 	mkdir -p /newroot/etc/cryptmount
