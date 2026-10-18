@@ -1,0 +1,3 @@
+#!/bin/sh
+. /functions.sh
+ps4_change_led violet_blue

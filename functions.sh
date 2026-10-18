@@ -58,6 +58,7 @@ rescueshell() {
 	initramfs_quiet=false
 	if [ "$rescueshell" != 'true' ]; then
 		# If we did not forced rescueshell by kernel opt, print additional message.
+		ps4_change_led orange
 		ewarn "Dropping to rescueshell because of above error."
 	fi
 	
@@ -511,6 +512,37 @@ ps4hdd_part() {
 		fi
 	done
 	return 1
+}
+
+ps4_change_led() {
+	local led_base='/sys/class/leds'
+	local color="${1:-}"
+	local led_path led_color target
+
+	if [ -z "${color}" ]; then
+		return 2
+	fi
+
+	target=''
+	for led_path in "${led_base}"/ps4:*:status/brightness; do
+		[ -e "${led_path}" ] || continue
+		led_color=${led_path##*/ps4:}
+		led_color=${led_color%:status/brightness}
+		if [ "${led_color}" = "${color}" ]; then
+			target="${led_path}"
+			break
+		fi
+	done
+	if [ -z "${target}" ]; then
+		return 1
+	fi
+
+	for led_path in "${led_base}"/ps4:*:status/brightness; do
+		[ -w "${led_path}" ] || continue
+		printf '0\n' > "${led_path}" || return 1
+	done
+	sleep 1
+	printf '255\n' > "${target}"
 }
 
 ps4hdd_open() {
