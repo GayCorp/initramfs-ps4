@@ -57,15 +57,7 @@ ver="$(cat /VERSION)"
 hash="$(cat /GIT_HASH)"
 # figure out southbridge
 sb="$(ps4_southbridge)"
-einfo "initramfs-ps4 ${ver}-git-${hash}. Linux kernel ${kernelver}. Running ${sb} Southbridge.\n"
-case "$kernelver" in
-    *Strawberry*)
-        ;;
-    *)
-        eerror "You aren't using a Strawberry kernel, We can't help with these."
-        echo
-        ;;
-esac
+einfo "initramfs-ps4 ${ver}-git-${hash}. Linux kernel ${kernelver}. Running ${sb}.\n"
 emount /proc /sys
 
 # Disable kernel messages from popping onto the screen
