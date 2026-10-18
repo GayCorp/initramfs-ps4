@@ -14,3 +14,21 @@ On a linux host, run `./bake.sh`, It will produce an `initramfs.cpio.gz` file. (
 The PS4 loader must add `/key/eap_hdd_key.bin` to the initramfs. The internal drive can not be opened without it.
 
 ...Or download from releases https://github.com/GattoDev-debug/initramfs-ps4/releases/latest
+
+# Bootargs
+
+options for initramfs in bootargs.txt:
+
+`quiet` - disables output (most)
+
+`debug` - enables on-screen kernel logging
+
+format:
+
+`initramfs=option1,option2,etc...`
+
+for example
+
+`initramfs=quiet,debug`
+
+this will enable no output and on screen kernel logging

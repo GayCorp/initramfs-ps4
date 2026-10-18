@@ -62,8 +62,13 @@ emount /proc /sys
 
 # Disable kernel messages from popping onto the screen
 echo 0 > /proc/sys/kernel/printk
-
 process_commandline_options
+if has_cmdline "debug"; then
+	echo 7 > /proc/sys/kernel/printk
+fi
+if has_cmdline "quiet"; then
+	initramfs_quiet=true
+fi
 InitializeBusybox
 emount /dev
 run_hooks early
