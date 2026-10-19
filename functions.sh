@@ -581,7 +581,7 @@ ps4_southbridge() {
         esac
     fi
 
-    [ -n "$sb" ] || return 1
+	[ -n "$sb" ] || sb="Unknown Southbridge"
     printf '%s\n' "$sb"
 }
 ps4_is_southbridge() {
@@ -608,6 +608,7 @@ ps4_southbridge_code() {
         "Baikal B0")  echo 0x30200 ;;
         "Baikal B1")  echo 0x30201 ;;
         "Belize2 A0") echo 0x40100 ;;
+		"Unknown Southbridge") echo 0x????? ;;
         *)            return 1 ;;
     esac
 }
@@ -623,6 +624,7 @@ ps4_southbridge_name() {
         0x30200) echo "Baikal B0"  ;;
         0x30201) echo "Baikal B1"  ;;
         0x40100) echo "Belize2 A0" ;;
+		0x?????) echo "Unknown Southbridge" ;;
         *)       return 1 ;;
     esac
 }
