@@ -88,6 +88,9 @@ run_hooks pre_newroot_mount
 use rootdelay rootdelay
 ps4_wait_disks 8
 echo
+if ! ps4_is_southbridge "baikal"; then
+	ps4hdd_open # just so its accessible from the os...
+fi
 if ! ps4_find_install && use root; then
 	emount /newroot
 fi
