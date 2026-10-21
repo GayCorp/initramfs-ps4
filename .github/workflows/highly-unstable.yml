@@ -1,0 +1,103 @@
+name: Build and Update Highly Unstable
+
+on:
+  push:
+    branches: [highly-unstable]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, 'nobuild') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install cpio
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cpio
+
+      - name: Fetch private firmware
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          set -eu
+
+          TEMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEMP_DIR"' EXIT
+
+          AUTH="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+
+          git -c http.extraheader="AUTHORIZATION: basic $AUTH" \
+            clone --depth 1 \
+            https://github.com/GayCorp/initramfs-ps4-private.git \
+            "$TEMP_DIR/firmware"
+
+          test -d "$TEMP_DIR/firmware/amdgpu"
+          test -d "$TEMP_DIR/firmware/mrvl"
+
+          mkdir -p lib/firmware
+
+          cp -a "$TEMP_DIR/firmware/amdgpu" lib/firmware/
+          cp -a "$TEMP_DIR/firmware/mrvl" lib/firmware/
+
+          echo "Private firmware copied successfully."
+          du -sh lib/firmware/amdgpu lib/firmware/mrvl
+
+      - name: Make files executable
+        run: |
+          find . -path './.git' -prune -o \
+            -type f -exec chmod +x {} +
+
+      - name: Make bake.sh executable
+        run: chmod +x bake.sh
+
+      - name: Run bake.sh
+        run: ./bake.sh -production
+
+      - name: Verify archive
+        run: |
+          set -eu
+
+          test -s initramfs.cpio.gz
+
+          echo "--- Archive size ---"
+          ls -lh initramfs.cpio.gz
+
+          echo "--- Archive contents (first 20 entries) ---"
+          zcat initramfs.cpio.gz | cpio -it --quiet | head -20
+
+          echo "--- Total entries ---"
+          zcat initramfs.cpio.gz | cpio -it --quiet | wc -l
+
+          echo "--- Verify firmware is included ---"
+          zcat initramfs.cpio.gz | cpio -it --quiet |
+            grep -E '^(\./)?lib/firmware/(amdgpu|mrvl)/'
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: initramfs-highly-unstable-${{ github.sha }}
+          path: initramfs.cpio.gz
+          retention-days: 30
+
+      - name: Update highly-unstable prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: highly-unstable
+          name: "Highly unstable (bleeding edge)"
+          body: |
+            Rolling prerelease — always the newest successful build from `highly-unstable`.
+
+            **Commit:** ${{ github.sha }}
+            **Archive:** `initramfs.cpio.gz`
+          files: initramfs.cpio.gz
+          fail_on_unmatched_files: true
+          make_latest: false
+          prerelease: true
