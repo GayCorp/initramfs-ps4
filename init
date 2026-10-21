@@ -88,8 +88,10 @@ run_hooks pre_newroot_mount
 use rootdelay rootdelay
 ps4_wait_disks 8
 echo
+
 if ! ps4_is_southbridge "baikal"; then
 	ps4hdd_open # just so its accessible from the os...
+	run_hooks ps4hdd_open
 fi
 if ! ps4_find_install && use root; then
 	emount /newroot
@@ -98,6 +100,10 @@ while ! mountpoint -q /newroot; do
 	eerror "No Linux installation is mounted on /newroot."
 	ewarn "Install with 'install-linux-int.sh' (internal) or 'install-linux-ext.sh' (USB),"
 	ewarn "or run 'find-install.sh', then run 'resume-boot'."
+	rescueshell
+done
+while has_cmdline "noboot"; do
+	ewarn "We were asked to not boot, we're not booting."
 	rescueshell
 done
 ps4_prepare_newroot

@@ -2,8 +2,8 @@
 . /functions.sh
 
 boot=/ps4hdd/system/boot
-img=/ps4hdd/home/linux.img
-
+img=/ps4hdd/app/linux.img
+mkdir -p /ps4hdd/app
 if ! ps4hdd_open; then
 	eerror "Could not open the PS4 internal drive."
 	exit 1

@@ -668,9 +668,9 @@ ps4_find_install() {
 		return 1
 	fi
 	ewarn "External installation not found, checking internal drive..."
-	if ps4hdd_open && [ -f /ps4hdd/home/linux.img ]; then
-		ps4_fsck /ps4hdd/home/linux.img
-		if mount /ps4hdd/home/linux.img /newroot; then
+	if ps4hdd_open && [ -f /ps4hdd/app/linux.img ]; then
+		ps4_fsck /ps4hdd/app/linux.img
+		if mount /ps4hdd/app/linux.img /newroot; then
 			einfo "Mounted internal installation."
 			return 0
 		fi

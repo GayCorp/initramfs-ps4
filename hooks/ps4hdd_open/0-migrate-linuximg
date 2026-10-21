@@ -1,0 +1,22 @@
+#!/bin/sh
+
+source=/ps4hdd/home/linux.img
+destination=/ps4hdd/app/linux.img
+
+if [ ! -f "$source" ]; then
+	return 0
+fi
+
+if [ -e "$destination" ]; then
+	ewarn "Not migrating $source: $destination already exists."
+	return 0
+fi
+
+if ! mkdir -p /ps4hdd/app; then
+	ewarn "Could not create /ps4hdd/app."
+	return 0
+fi
+
+if ! mv "$source" "$destination"; then
+	ewarn "Could not migrate $source to $destination."
+fi
