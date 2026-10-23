@@ -1,0 +1,47 @@
+#!/bin/sh
+
+case "$1" in
+	deconfig)
+		ip addr flush dev "${interface}"
+		ip route del default dev "${interface}" 2>/dev/null || :
+	;;
+	bound|renew)
+		[ -n "${ip}" ] || exit 1
+		prefix=32
+		if [ -n "${subnet}" ]; then
+			prefix=0
+			old_ifs="${IFS}"
+			IFS=.
+			set -- ${subnet}
+			IFS="${old_ifs}"
+			for octet do
+				case "${octet}" in
+					255) prefix=$((prefix + 8)) ;;
+					254) prefix=$((prefix + 7)) ;;
+					252) prefix=$((prefix + 6)) ;;
+					248) prefix=$((prefix + 5)) ;;
+					240) prefix=$((prefix + 4)) ;;
+					224) prefix=$((prefix + 3)) ;;
+					192) prefix=$((prefix + 2)) ;;
+					128) prefix=$((prefix + 1)) ;;
+					0) ;;
+					*) exit 1 ;;
+				esac
+			done
+		fi
+
+		ip addr flush dev "${interface}" || exit 1
+		ip addr add "${ip}/${prefix}" dev "${interface}" || exit 1
+		ip link set dev "${interface}" up || exit 1
+
+		if [ -n "${router}" ]; then
+			set -- ${router}
+			ip route replace default via "$1" dev "${interface}" || exit 1
+		fi
+
+		: > /etc/resolv.conf || exit 1
+		for dns_server in ${dns}; do
+			printf 'nameserver %s\n' "${dns_server}" >> /etc/resolv.conf || exit 1
+		done
+	;;
+esac

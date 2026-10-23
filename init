@@ -98,7 +98,7 @@ if ! ps4_find_install && use root; then
 fi
 while ! mountpoint -q /newroot; do
 	eerror "No Linux installation is mounted on /newroot."
-	ewarn "Install with 'install-linux-int.sh' (internal) or 'install-linux-ext.sh' (USB),"
+	ewarn "Install with 'install-linux-int.sh' (internal), `dw-linux-int.sh` (internal, downloads over ethernet) or 'install-linux-ext.sh' (USB),"
 	ewarn "or run 'find-install.sh', then run 'resume-boot'."
 	rescueshell
 done

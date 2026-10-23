@@ -14,8 +14,8 @@ if [ -f "${boot}/psxitarch.tar.xz" ] && ! [ -f "${boot}/distro.tar.xz" ]; then
 	ewarn "psxitarch.tar.xz was renamed to distro.tar.xz. Use distro.tar.xz from now on."
 fi
 
-if ! distro="$(ps4_find_distro "${boot}")"; then
-	eerror "No distro.tar.xz, distro.tar.gz or distro.tar.bz2 in ${boot}."
+if ! distro="$(ps4_find_distro /ps4hdd/system)" && ! distro="$(ps4_find_distro "${boot}")"; then
+	eerror "No distro.tar.xz, distro.tar.gz or distro.tar.bz2 in /ps4hdd/system or ${boot}."
 	exit 1
 fi
 

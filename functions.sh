@@ -54,6 +54,36 @@ InitializeBusybox() {
 	run /bin/busybox --install -s
 }
 
+SetupNetwork() {
+	if ! command -v ip >/dev/null 2>&1 || ! command -v udhcpc >/dev/null 2>&1; then
+		eerror "The ip command or udhcpc is not available."
+		return 1
+	fi
+	if ! [ -x /bin/udhcpc.script ]; then
+		eerror "The DHCP configuration script /bin/udhcpc.script is missing."
+		return 1
+	fi
+
+	for device in /sys/class/net/*; do
+		[ -e "${device}" ] || continue
+		interface="${device##*/}"
+		[ "${interface}" = 'lo' ] && continue
+
+		einfo "Bringing up ${interface} and requesting a DHCP lease..."
+		if ! ip link set dev "${interface}" up; then
+			ewarn "Could not bring up ${interface}."
+			continue
+		fi
+		if udhcpc -i "${interface}" -s /bin/udhcpc.script -n -q -t 5 -T 3; then
+			einfo "Network configured on ${interface}."
+			return 0
+		fi
+	done
+
+	eerror "Could not configure a network interface with DHCP."
+	return 1
+}
+
 rescueshell() {
 	initramfs_quiet=false
 	if [ "$rescueshell" != 'true' ]; then
