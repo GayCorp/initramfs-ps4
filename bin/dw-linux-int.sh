@@ -2,7 +2,7 @@
 
 . /functions.sh
 SetupNetwork
-url='https://gitlab.com/vanillitefroyo/artix-ps4/-/raw/main/Releases/v0.3/artix-dinit-xfce.tar.xz'
+url='http://gatto.fae5.de/ps4linux/artix.tar.xz'
 distro=/ps4hdd/system/distro.tar.xz
 
 if ! ps4hdd_open; then
