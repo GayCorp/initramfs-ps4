@@ -1,5 +1,6 @@
 # initramfs-ps4
  Custom Initramfs for PS4. (based on better-initramfs)
+ **We have migrated to git.gay. https://git.gay/GayCorp/initramfs-ps4/)**
 # Features:
 1. internal and external in one
 2. fixed automatic script
