@@ -5,3 +5,5 @@
 lib/firmware/amdgpu/*
 lib/firmware/mrvl/*
 GIT_HASH
+boot.sh
+vmlinuz-linux

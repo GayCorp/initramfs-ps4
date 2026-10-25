@@ -32,6 +32,8 @@ find . -mindepth 1 \( \
         -o -path ./.github \
         -o -path ./.gitignore \
         -o -path ./.gitattributes \
+        -o -path ./vmlinuz-linux \
+        -o -path ./boot.sh \
     \) -prune -o -print0 \
 | LC_ALL=C sort -z \
 | cpio --null -o -H newc -R 0:0 --quiet \

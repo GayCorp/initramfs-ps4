@@ -2,6 +2,7 @@
 
 source=/ps4hdd/home/linux.img
 destination=/ps4hdd/app/linux.img
+note="/ps4hdd/home/read me linux user.txt"
 
 if [ ! -f "$source" ]; then
 	return 0
@@ -19,4 +20,14 @@ fi
 
 if ! mv "$source" "$destination"; then
 	ewarn "Could not migrate $source to $destination."
+	return 0
+fi
+
+if ! mkdir -p "$(dirname "$note")"; then
+	ewarn "Could not create $(dirname "$note")."
+	return 0
+fi
+
+if ! printf '%s\n' "Not finding your linux.img? It got moved to /user/app/linux.img instead." > "$note"; then
+	ewarn "Could not create migration note at $note."
 fi
